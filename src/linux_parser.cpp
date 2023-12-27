@@ -66,8 +66,31 @@ std::vector<int> LinuxParser::Pids() {
   return pids;
 }
 
-// TODO: Read and return the system memory utilization
-float LinuxParser::MemoryUtilization() { return 0.0; }
+float LinuxParser::MemoryUtilization() {
+  unsigned long memTotal{0UL}, memAvailable{0UL};
+  std::ifstream meminfo_file{kProcDirectory + kMeminfoFilename};
+  if (meminfo_file.is_open()) {
+    bool memTotalFound{false}, memAvailableFound{false};
+    std::string line;
+    while (!(memTotalFound && memAvailableFound)) {
+      std::getline(meminfo_file, line);
+      line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
+                 line.end());  // eliminate duplicate spaces
+      std::stringstream ss{line};
+      std::string first_token;
+      ss >> first_token;
+      if (first_token == "MemTotal:") {
+        ss >> memTotal;
+        memTotalFound = true;
+      } else if (first_token == "MemAvailable:") {
+        ss >> memAvailable;
+        memAvailableFound = true;
+      }
+    }
+    meminfo_file.close();
+  }
+  return static_cast<float>(memTotal - memAvailable) / memTotal;
+}
 
 // TODO: Read and return the system uptime
 long LinuxParser::UpTime() { return 0; }
@@ -79,8 +102,8 @@ unsigned long LinuxParser::Jiffies() { return ActiveJiffies() + IdleJiffies(); }
 unsigned long LinuxParser::ActiveJiffies(int pid [[maybe_unused]]) { return 0; }
 
 unsigned long LinuxParser::ActiveJiffies() {
-  auto cpuUtilization = CpuUtilization();
-  auto result = 0UL;
+  unsigned long result{0UL};
+  auto cpuUtilization{CpuUtilization()};
   for (const auto& cpuState :
        {CPUStates::kUser_, CPUStates::kNice_, CPUStates::kSystem_,
         CPUStates::kIRQ_, CPUStates::kSoftIRQ_, CPUStates::kSteal_})
@@ -89,8 +112,8 @@ unsigned long LinuxParser::ActiveJiffies() {
 }
 
 unsigned long LinuxParser::IdleJiffies() {
-  auto cpuUtilization = CpuUtilization();
-  auto result = 0UL;
+  unsigned long result{0UL};
+  auto cpuUtilization{CpuUtilization()};
   for (const auto& cpuState : {CPUStates::kIdle_, CPUStates::kIOwait_})
     result += std::stoul(cpuUtilization[cpuState]);
   return result;
