@@ -72,8 +72,8 @@ float LinuxParser::MemoryUtilization() {
   if (meminfo_file.is_open()) {
     bool memTotalFound{false}, memAvailableFound{false};
     std::string line;
-    while (!(memTotalFound && memAvailableFound)) {
-      getline(meminfo_file, line);
+    while (getline(meminfo_file, line) &&
+           !(memTotalFound && memAvailableFound)) {
       line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
                  line.end());  // eliminate duplicate spaces
       std::stringstream ss{line};
@@ -219,9 +219,28 @@ std::string LinuxParser::Ram(int pid) {
   return std::to_string(ram / 1024);  // convert from kB to MB
 }
 
-// TODO: Read and return the user ID associated with a process
-// REMOVE: [[maybe_unused]] once you define the function
-std::string LinuxParser::Uid(int pid [[maybe_unused]]) { return std::string(); }
+std::string LinuxParser::Uid(int pid) {
+  std::string uid;
+  std::ifstream status_file{kProcDirectory + std::to_string(pid) +
+                            kStatusFilename};
+  if (status_file.is_open()) {
+    std::string line;
+    std::string first_token;
+    while (getline(status_file, line)) {
+      std::replace(line.begin(), line.end(), '\t', ' ');
+      line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
+                 line.end());  // eliminate duplicate spaces
+      std::stringstream ss{line};
+      ss >> first_token;
+      if (first_token == "Uid:") {
+        ss >> uid;
+        break;
+      }
+    }
+    status_file.close();
+  }
+  return uid;
+}
 
 // TODO: Read and return the user associated with a process
 // REMOVE: [[maybe_unused]] once you define the function
