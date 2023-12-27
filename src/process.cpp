@@ -15,7 +15,7 @@ std::string Process::Command() { return LinuxParser::Command(pid_); }
 
 std::string Process::Ram() { return LinuxParser::Ram(pid_); }
 
-std::string Process::User() { LinuxParser::User(pid_); }
+std::string Process::User() { return LinuxParser::User(pid_); }
 
 long int Process::UpTime() { LinuxParser::UpTime(pid_); }
 
