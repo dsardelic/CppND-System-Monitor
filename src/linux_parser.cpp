@@ -5,7 +5,7 @@
 #include <algorithm>  // std::unique
 #include <fstream>    // std::ifstream
 #include <sstream>    // std::istringstream, std::stringstream
-#include <string>     // std::string
+#include <string>     // std::string, std::stol
 #include <vector>     // std:vector
 
 template <char Duplicate>
@@ -19,7 +19,7 @@ std::string LinuxParser::OperatingSystem() {
   std::string value;
   std::ifstream filestream(kOSPath);
   if (filestream.is_open()) {
-    while (std::getline(filestream, line)) {
+    while (getline(filestream, line)) {
       std::replace(line.begin(), line.end(), ' ', '_');
       std::replace(line.begin(), line.end(), '=', ' ');
       std::replace(line.begin(), line.end(), '"', ' ');
@@ -40,7 +40,7 @@ std::string LinuxParser::Kernel() {
   std::string line;
   std::ifstream stream(kProcDirectory + kVersionFilename);
   if (stream.is_open()) {
-    std::getline(stream, line);
+    getline(stream, line);
     std::istringstream linestream(line);
     linestream >> os >> version >> kernel;
   }
@@ -73,7 +73,7 @@ float LinuxParser::MemoryUtilization() {
     bool memTotalFound{false}, memAvailableFound{false};
     std::string line;
     while (!(memTotalFound && memAvailableFound)) {
-      std::getline(meminfo_file, line);
+      getline(meminfo_file, line);
       line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
                  line.end());  // eliminate duplicate spaces
       std::stringstream ss{line};
@@ -92,8 +92,17 @@ float LinuxParser::MemoryUtilization() {
   return static_cast<float>(memTotal - memAvailable) / memTotal;
 }
 
-// TODO: Read and return the system uptime
-long LinuxParser::UpTime() { return 0; }
+long LinuxParser::UpTime() {
+  long upTime{0L};
+  std::ifstream uptime_file{kProcDirectory + kUptimeFilename};
+  if (uptime_file.is_open()) {
+    std::string line;
+    getline(uptime_file, line);
+    upTime = std::stol(line.substr(0, line.find_first_of(' ')));
+    uptime_file.close();
+  }
+  return upTime;
+}
 
 unsigned long LinuxParser::Jiffies() { return ActiveJiffies() + IdleJiffies(); }
 
@@ -123,22 +132,17 @@ std::vector<std::string> LinuxParser::CpuUtilization() {
   std::string line;
   std::ifstream proc_file{kProcDirectory + kStatFilename};
   if (proc_file.is_open()) {
-    std::getline(proc_file, line);
+    getline(proc_file, line);
     proc_file.close();
   }
-
-  // eliminate duplicate spaces
   line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
-             line.end());
-
+             line.end());  // eliminate duplicate spaces
   std::stringstream ss;
   ss << line;
-
   std::string cpu;
-  ss >> cpu;  // skip the 'cpu' string at the beginning of the line
-
-  std::string jiffy;
+  ss >> cpu;  // skip the "cpu " string at the beginning of the line
   std::vector<std::string> jiffies;
+  std::string jiffy;
   for (auto i = 0; i < 8; ++i) {
     ss >> jiffy;
     jiffies.push_back(jiffy);
@@ -146,11 +150,41 @@ std::vector<std::string> LinuxParser::CpuUtilization() {
   return jiffies;
 }
 
-// TODO: Read and return the total number of processes
-int LinuxParser::TotalProcesses() { return 0; }
+int LinuxParser::TotalProcesses() {
+  int totalProcesses{0};
+  std::ifstream proc_file{kProcDirectory + kStatFilename};
+  if (proc_file.is_open()) {
+    std::string line, token;
+    while (getline(proc_file, line)) {
+      std::stringstream ss{line};
+      ss >> token;
+      if (token == "processes") {
+        ss >> totalProcesses;
+        break;
+      }
+    }
+    proc_file.close();
+  }
+  return totalProcesses;
+}
 
-// TODO: Read and return the number of running processes
-int LinuxParser::RunningProcesses() { return 0; }
+int LinuxParser::RunningProcesses() {
+  int runningProcesses{0};
+  std::ifstream proc_file{kProcDirectory + kStatFilename};
+  if (proc_file.is_open()) {
+    std::string line, token;
+    while (getline(proc_file, line)) {
+      std::stringstream ss{line};
+      ss >> token;
+      if (token == "procs_running") {
+        ss >> runningProcesses;
+        break;
+      }
+    }
+    proc_file.close();
+  }
+  return runningProcesses;
+}
 
 // TODO: Read and return the command associated with a process
 // REMOVE: [[maybe_unused]] once you define the function
