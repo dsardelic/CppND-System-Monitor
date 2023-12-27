@@ -198,6 +198,26 @@ std::string LinuxParser::Command(int pid) {
 }
 
 std::string LinuxParser::Ram(int pid) {
+  unsigned long ram{0UL};
+  std::ifstream status_file{kProcDirectory + std::to_string(pid) +
+                            kStatusFilename};
+  if (status_file.is_open()) {
+    std::string line;
+    std::string first_token;
+    while (getline(status_file, line)) {
+      line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
+                 line.end());  // eliminate duplicate spaces
+      std::stringstream ss{line};
+      ss >> first_token;
+      if (first_token == "VmSize:") {
+        ss >> ram;
+        break;
+      }
+    }
+    status_file.close();
+  }
+  return std::to_string(ram / 1024);  // convert from kB to MB
+}
 
 // TODO: Read and return the user ID associated with a process
 // REMOVE: [[maybe_unused]] once you define the function
