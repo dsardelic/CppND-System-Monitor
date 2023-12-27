@@ -1,6 +1,7 @@
 #include "linux_parser.h"
 
 #include <dirent.h>  // DIR, opendir
+#include <unistd.h>  // sysconf(_SC_CLK_TCK)
 
 #include <algorithm>  // std::unique
 #include <fstream>    // std::ifstream
@@ -265,6 +266,21 @@ std::string LinuxParser::User(int pid) {
   return username;
 }
 
-// TODO: Read and return the uptime of a process
-// REMOVE: [[maybe_unused]] once you define the function
-long LinuxParser::UpTime(int pid [[maybe_unused]]) { return 0; }
+long LinuxParser::UpTime(int pid) {
+  long upTime{0L};
+  std::ifstream stat_file{kProcDirectory + std::to_string(pid) + kStatFilename};
+  if (stat_file.is_open()) {
+    std::string line;
+    getline(stat_file, line);
+    std::stringstream ss{line};
+    std::string foo;
+    for (auto i = 0; i < 21; ++i) {
+      ss >> foo;
+    }
+    long clock_ticks;
+    ss >> clock_ticks;
+    upTime = clock_ticks / sysconf(_SC_CLK_TCK);
+    stat_file.close();
+  }
+  return upTime;
+}
