@@ -6,6 +6,8 @@
 
 #include "linux_parser.h"
 
+Process::Process(int pid) : pid_{pid} {};
+
 int Process::Pid() const { return pid_; }
 
 float Process::CpuUtilization() const {
