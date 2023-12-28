@@ -2,7 +2,7 @@
 #define SYSTEM_PARSER_H
 
 #include <string>  //std::string
-#include <vector>  // std::vector
+#include <vector>  //std::vector
 
 namespace LinuxParser {
 // Paths

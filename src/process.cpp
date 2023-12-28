@@ -1,6 +1,6 @@
 #include "process.h"
 
-#include <unistd.h>  // sysconf(_SC_CLK_TCK)
+#include <unistd.h>  // sysconf
 
 #include <string>
 

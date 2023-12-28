@@ -1,13 +1,13 @@
 #include "linux_parser.h"
 
 #include <dirent.h>  // DIR, opendir
-#include <unistd.h>  // sysconf(_SC_CLK_TCK)
+#include <unistd.h>  // sysconf
 
 #include <algorithm>  // std::unique
 #include <fstream>    // std::ifstream
 #include <sstream>    // std::istringstream, std::stringstream
 #include <string>     // std::string, std::stol
-#include <vector>     // std:vector
+#include <vector>     // std::vector
 
 template <char Duplicate>
 bool BothCharsAre(char lhs, char rhs) {
@@ -68,17 +68,17 @@ std::vector<int> LinuxParser::Pids() {
 }
 
 float LinuxParser::MemoryUtilization() {
-  unsigned long memTotal{0UL}, memAvailable{0UL};
+  unsigned long memTotal{}, memAvailable{};
   std::ifstream meminfo_file{kProcDirectory + kMeminfoFilename};
   if (meminfo_file.is_open()) {
     bool memTotalFound{false}, memAvailableFound{false};
     std::string line;
+    std::string first_token;
     while (getline(meminfo_file, line) &&
            !(memTotalFound && memAvailableFound)) {
       line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
                  line.end());  // eliminate duplicate spaces
       std::stringstream ss{line};
-      std::string first_token;
       ss >> first_token;
       if (first_token == "MemTotal:") {
         ss >> memTotal;
@@ -94,7 +94,7 @@ float LinuxParser::MemoryUtilization() {
 }
 
 long LinuxParser::UpTime() {
-  long upTime{0L};
+  long upTime{};
   std::ifstream uptime_file{kProcDirectory + kUptimeFilename};
   if (uptime_file.is_open()) {
     std::string line;
@@ -108,7 +108,7 @@ long LinuxParser::UpTime() {
 unsigned long LinuxParser::Jiffies() { return ActiveJiffies() + IdleJiffies(); }
 
 unsigned long LinuxParser::ActiveJiffies(int pid) {
-  unsigned long activeJiffies{0UL};
+  unsigned long activeJiffies{};
   std::ifstream stat_file{kProcDirectory + std::to_string(pid) + kStatFilename};
   if (stat_file.is_open()) {
     std::string line;
@@ -129,7 +129,7 @@ unsigned long LinuxParser::ActiveJiffies(int pid) {
 }
 
 unsigned long LinuxParser::ActiveJiffies() {
-  unsigned long result{0UL};
+  unsigned long result{};
   auto cpuUtilization{CpuUtilization()};
   for (const auto& cpuState :
        {CPUStates::kUser_, CPUStates::kNice_, CPUStates::kSystem_,
@@ -139,7 +139,7 @@ unsigned long LinuxParser::ActiveJiffies() {
 }
 
 unsigned long LinuxParser::IdleJiffies() {
-  unsigned long result{0UL};
+  unsigned long result{};
   auto cpuUtilization{CpuUtilization()};
   for (const auto& cpuState : {CPUStates::kIdle_, CPUStates::kIOwait_})
     result += std::stoul(cpuUtilization[cpuState]);
@@ -147,29 +147,33 @@ unsigned long LinuxParser::IdleJiffies() {
 }
 
 std::vector<std::string> LinuxParser::CpuUtilization() {
-  std::string line;
+  std::vector<std::string> jiffies = {"0", "0", "0", "1", "0", "0", "0", "0"};
   std::ifstream proc_file{kProcDirectory + kStatFilename};
+  std::string line;
   if (proc_file.is_open()) {
+    jiffies.clear();
     getline(proc_file, line);
+    line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
+               line.end());  // eliminate duplicate spaces
+    std::stringstream ss{line};
+    std::string cpu;
+    ss >> cpu;  // skip the "cpu " string at the beginning of the line
+    std::string jiffy;
+    const auto cpuStates = {CPUStates::kUser_,    CPUStates::kNice_,
+                            CPUStates::kSystem_,  CPUStates::kIdle_,
+                            CPUStates::kIOwait_,  CPUStates::kIRQ_,
+                            CPUStates::kSoftIRQ_, CPUStates::kSteal_};
+    for (std::size_t i = 0UL; i < cpuStates.size(); ++i) {
+      ss >> jiffy;
+      jiffies.push_back(jiffy);
+    }
     proc_file.close();
-  }
-  line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
-             line.end());  // eliminate duplicate spaces
-  std::stringstream ss;
-  ss << line;
-  std::string cpu;
-  ss >> cpu;  // skip the "cpu " string at the beginning of the line
-  std::vector<std::string> jiffies;
-  std::string jiffy;
-  for (auto i = 0; i < 8; ++i) {
-    ss >> jiffy;
-    jiffies.push_back(jiffy);
   }
   return jiffies;
 }
 
 int LinuxParser::TotalProcesses() {
-  int totalProcesses{0};
+  int totalProcesses{};
   std::ifstream proc_file{kProcDirectory + kStatFilename};
   if (proc_file.is_open()) {
     std::string line, token;
@@ -187,7 +191,7 @@ int LinuxParser::TotalProcesses() {
 }
 
 int LinuxParser::RunningProcesses() {
-  int runningProcesses{0};
+  int runningProcesses{};
   std::ifstream proc_file{kProcDirectory + kStatFilename};
   if (proc_file.is_open()) {
     std::string line, token;
@@ -216,12 +220,11 @@ std::string LinuxParser::Command(int pid) {
 }
 
 std::string LinuxParser::Ram(int pid) {
-  unsigned long ram{0UL};
+  unsigned long ram{};
   std::ifstream status_file{kProcDirectory + std::to_string(pid) +
                             kStatusFilename};
   if (status_file.is_open()) {
-    std::string line;
-    std::string first_token;
+    std::string line, first_token;
     while (getline(status_file, line)) {
       line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
                  line.end());  // eliminate duplicate spaces
@@ -242,8 +245,7 @@ std::string LinuxParser::Uid(int pid) {
   std::ifstream status_file{kProcDirectory + std::to_string(pid) +
                             kStatusFilename};
   if (status_file.is_open()) {
-    std::string line;
-    std::string first_token;
+    std::string line, first_token;
     while (getline(status_file, line)) {
       std::replace(line.begin(), line.end(), '\t', ' ');
       line.erase(std::unique(line.begin(), line.end(), BothCharsAre<' '>),
@@ -262,16 +264,14 @@ std::string LinuxParser::Uid(int pid) {
 
 std::string LinuxParser::User(int pid) {
   std::string username;
-  std::string user_id{Uid(pid)};
   std::ifstream status_file{kPasswordPath};
   if (status_file.is_open()) {
-    std::string line;
-    std::string first_token;
+    std::string user_id{Uid(pid)}, line, first_token;
     while (getline(status_file, line)) {
-      std::size_t colon1_index{line.find_first_of(':', 0)};
-      std::size_t colon2_index{line.find_first_of(':', colon1_index + 1)};
-      std::size_t colon3_index{line.find_first_of(':', colon2_index + 1)};
-      std::string parsed_user_id{
+      auto colon1_index{line.find_first_of(':', 0)};
+      auto colon2_index{line.find_first_of(':', colon1_index + 1)};
+      auto colon3_index{line.find_first_of(':', colon2_index + 1)};
+      auto parsed_user_id{
           line.substr(colon2_index + 1, colon3_index - (colon2_index + 1))};
       if (parsed_user_id == user_id) {
         username = line.substr(0, colon1_index);
@@ -284,7 +284,7 @@ std::string LinuxParser::User(int pid) {
 }
 
 long LinuxParser::UpTime(int pid) {
-  long upTime{0L};
+  long upTime{};
   std::ifstream stat_file{kProcDirectory + std::to_string(pid) + kStatFilename};
   if (stat_file.is_open()) {
     std::string line;
@@ -297,7 +297,6 @@ long LinuxParser::UpTime(int pid) {
     long jiffies_at_start;
     ss >> jiffies_at_start;
     upTime = UpTime() - jiffies_at_start / sysconf(_SC_CLK_TCK);
-
     stat_file.close();
   }
   return upTime;
