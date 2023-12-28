@@ -7,6 +7,14 @@
 #include "process.h"
 #include "processor.h"
 
+System::System() {
+  auto cpu_ = Cpu();
+  auto processes_ = std::vector<Process>();
+  for (auto&& pid : LinuxParser::Pids()) {
+    processes_.emplace_back(Process(pid));
+  }
+}
+
 Processor& System::Cpu() { return cpu_; }
 
 std::vector<Process>& System::Processes() { return processes_; }
