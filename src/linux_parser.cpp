@@ -107,9 +107,26 @@ long LinuxParser::UpTime() {
 
 unsigned long LinuxParser::Jiffies() { return ActiveJiffies() + IdleJiffies(); }
 
-// TODO: Read and return the number of active jiffies for a PID
-// REMOVE: [[maybe_unused]] once you define the function
-unsigned long LinuxParser::ActiveJiffies(int pid [[maybe_unused]]) { return 0; }
+unsigned long LinuxParser::ActiveJiffies(int pid) {
+  unsigned long activeJiffies{0UL};
+  std::ifstream stat_file{kProcDirectory + std::to_string(pid) + kStatFilename};
+  if (stat_file.is_open()) {
+    std::string line;
+    getline(stat_file, line);
+    std::stringstream ss{line};
+    std::string foo;
+    for (auto i = 0; i < 13; ++i) {
+      ss >> foo;
+    }
+    unsigned long utime;
+    ss >> utime;
+    unsigned long stime;
+    ss >> stime;
+    activeJiffies = utime + stime;
+    stat_file.close();
+  }
+  return activeJiffies;
+}
 
 unsigned long LinuxParser::ActiveJiffies() {
   unsigned long result{0UL};
@@ -277,9 +294,10 @@ long LinuxParser::UpTime(int pid) {
     for (auto i = 0; i < 21; ++i) {
       ss >> foo;
     }
-    long clock_ticks;
-    ss >> clock_ticks;
-    upTime = clock_ticks / sysconf(_SC_CLK_TCK);
+    long jiffies_at_start;
+    ss >> jiffies_at_start;
+    upTime = UpTime() - jiffies_at_start / sysconf(_SC_CLK_TCK);
+
     stat_file.close();
   }
   return upTime;

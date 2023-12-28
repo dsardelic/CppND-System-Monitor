@@ -1,5 +1,7 @@
 #include "process.h"
 
+#include <unistd.h>  // sysconf(_SC_CLK_TCK)
+
 #include <string>
 
 #include "linux_parser.h"
@@ -7,8 +9,9 @@
 int Process::Pid() const { return pid_; }
 
 float Process::CpuUtilization() const {
-  return static_cast<float>(LinuxParser::ActiveJiffies(pid_)) /
-         LinuxParser::ActiveJiffies();
+  float activeTime = static_cast<float>(LinuxParser::ActiveJiffies(pid_)) /
+                     sysconf(_SC_CLK_TCK);
+  return activeTime / LinuxParser::UpTime(pid_);
 }
 
 std::string Process::Command() { return LinuxParser::Command(pid_); }
