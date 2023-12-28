@@ -1,23 +1,33 @@
 #include "system.h"
 
-#include <string>  // std::string
-#include <vector>  // std::vector
+#include <algorithm>  // std::sort
+#include <string>     // std::string
+#include <vector>     // std::vector
 
 #include "linux_parser.h"
 #include "process.h"
 #include "processor.h"
 
 System::System() {
-  auto cpu_ = Cpu();
-  auto processes_ = std::vector<Process>();
-  for (auto&& pid : LinuxParser::Pids()) {
-    processes_.emplace_back(Process(pid));
-  }
+  cpu_ = Cpu();
+  processes_ = std::vector<Process>();
 }
 
 Processor& System::Cpu() { return cpu_; }
 
-std::vector<Process>& System::Processes() { return processes_; }
+std::vector<Process>& System::Processes() {
+  processes_.clear();
+  auto processes = std::vector<Process>();
+  for (auto&& pid : LinuxParser::Pids()) {
+    processes.emplace_back(Process(pid));
+  }
+  std::sort(processes.begin(), processes.end());
+  for (auto i = 0; i < 10; ++i) {
+    processes_.emplace_back(processes.back());
+    processes.pop_back();
+  }
+  return processes_;
+}
 
 std::string System::Kernel() { return LinuxParser::Kernel(); }
 
